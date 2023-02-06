@@ -1,38 +1,30 @@
-# This File will contains a class to help generate a merged neural network
-# when given a larger network and a smalelr network, or two networks with 
-# the same number of layers. 
-# The output layer of the merged network is the difference in the
-# outputs of the two networks it is composed of. 
+# This file contains a class to help generate a merged neural network
+# when given a larger network and a smalelr network.
+# The output of the merged network is the difference in the
+# outputs of the larger and smaller network.
+
+# https://github.com/aicpslab/MergedNet
 
 # 8/19/2022
 # Wesley Cooke
-# Augusta University 
 
 # Dependencies
 import torch
 import torch.nn as nn
-import numpy as np
 import copy as cp
+import numpy as np
 
 
 class GenerateMergedNet:
     """
-    Class that contains methods used to generate a merged network. 
-    Based on the equations 12 - 27 of https://arxiv.org/pdf/2202.01214.pdf. 
+    Class that contains methods used to generate a merged network. Based on the equations 12 - 27 of https://arxiv.org/pdf/2202.01214.pdf. 
     """
 
     @staticmethod
     def from_PyTorch_Path(largePath:str, smallPath:str):
-        """ 
-        Method to get a dictionary containing the weights, biases, 
-        and activation functions of the merged network.
-
-        Typical Usage:
-            MergedDictionary = GenerateMergedNet.from_PyTorch_Path(path1, path2)
-        """
+        """ Method to get the Merged Network given two .pt or .pth paths."""
         
-        if (largePath.endswith(".pt") or largePath.endswith(".pth") and 
-            smallPath.endswith(".pt") or smallPath.endswith(".pth")): 
+        if (largePath.endswith(".pt") or largePath.endswith(".pth")) and (smallPath.endswith(".pt") or smallPath.endswith(".pth")): 
 
             LargeModel = torch.load(largePath)
             SmallModel = torch.load(smallPath)
@@ -44,14 +36,7 @@ class GenerateMergedNet:
 
     @staticmethod 
     def from_PyTorch_Models(largeModel, smallModel):
-        """
-        Method to get the Merged Network given two PyTorch Models 
-        This function can be used in place of "from_Pytorch_Path" if you 
-        have already loaded your models in the main program. 
-
-        Typical Usage:
-            MergedDictionary = GenerateMergedNet.from_PyTorch_Models(LargeModel, SmallModel)
-        """
+        """ Method to get the Merged Network given two PyTorch Models """
 
         LargeModelDict = GenerateMergedNet._extract_pytorch_wandb(largeModel)
         SmallModelDict = GenerateMergedNet._extract_pytorch_wandb(smallModel)
@@ -60,20 +45,6 @@ class GenerateMergedNet:
 
     @staticmethod
     def _extract_pytorch_wandb(model):
-        """
-        Function to extract the weights and biases of a pytorch network. 
-        Used internally in "from_PyTorch_Models" and "from_PyTorch_Path".
-
-        Typical Usage:
-            aModelDictionary = GenerateMergedNet._extract_pytorch_wandb(aModel)
-        
-        The returned dicitonary contains list of the following items:
-            "w": weights,
-            "b": biases, 
-            "w_shapes": weights_shape,
-            "b_shapes": biases_shape,
-            "acts": actFuncs, 
-        """
 
         weights = []
         biases = []
@@ -117,9 +88,6 @@ class GenerateMergedNet:
         # :TODO: Implement generating a merged network
         # from TensorFlow files.
 
-        # Basic idea is to convert Tensorflow to pytorch
-        # and work with pytorch representation. 
-
         raise NotImplementedError
 
     @staticmethod
@@ -127,27 +95,12 @@ class GenerateMergedNet:
         # :TODO: Implement generating a merged network
         # from Onnx files.
 
-        # Basic idea is to convert onnx to pytorch
-        # and work with pytorch representation
-
         raise NotImplementedError
 
     @staticmethod
     def from_WandB(aLargeModelDict, aSmallModelDict):
         """
         Based on Equations 12 - 27 of https://arxiv.org/pdf/2202.01214.pdf
-
-        Returns a dictionary containg a list of the following items: 
-        mergedDictionary = {
-            "w": wMerged,
-            "b": bMerged,
-            "acts": aMerged
-        }
-
-        Typical Usage:
-            LargeModelDict = GenerateMergedNet._extract_pytorch_wandb(LargeModel)
-            SmallModelDict = GenerateMergedNet._extract_pytorch_wandb(SmallModel)
-            MergedModelDict = GenreateMergedNet.from_WandB(LargeModelDict, SmallModelDict)
         """
 
         # Dictionary must contain weights, biases, activation functions,
@@ -174,8 +127,8 @@ class GenerateMergedNet:
         bMerged = []
 
         # This version assumes that all the 
-        # inner Activation Functions are the same. -> Don't know how to merge 
-        # two networks that use different activations between layers. 
+        # inner Activation Functions are the same. -> Don't know how to merge two networks that use different activations between layers. 
+        # For example: ReLU Functions. 
 
         aMerged = aLar #Keep the activations of the Large network. 
 
@@ -188,13 +141,8 @@ class GenerateMergedNet:
         # Layer 2 - Hidden Layers up to and including the last hidden layer of the smaller network.
         for i in range(1, numLayersSmall-1): # second argument is exclusive. 
 
-            tempWL = np.hstack((wLar[i], 
-                                np.zeros((wLarShape[i][0], 
-                                          wSmallShape[i][0]))))
-                                          
-            tempWS = np.hstack((np.zeros((bSmallShape[i][0], 
-                                          bLarShape[i][0])), 
-                                wSmall[i]))
+            tempWL = np.hstack((wLar[i], np.zeros((wLarShape[i][0], wSmallShape[i][0]))))
+            tempWS = np.hstack((np.zeros((bSmallShape[i][0], bLarShape[i][0])), wSmall[i]))
 
             wMerged.append(np.concatenate((tempWL, tempWS)))
             bMerged.append(np.concatenate((bLar[i], bSmall[i])))
@@ -205,29 +153,17 @@ class GenerateMergedNet:
 
         for i in range(numLayersSmall-1, numLayersLar-1):
 
-            tempWL = np.hstack((wLar[i], 
-                                np.zeros((wLarShape[i][0], 
-                                          wSmallShape[numLayersSmall-2][0]))))
-
-            tempWS = np.hstack((np.zeros((wSmallShape[numLayersSmall-2][0], 
-                                          wLarShape[i][0])), 
-                                np.eye(wSmallShape[numLayersSmall-2][0]))) # eye is identity matrix
+            tempWL = np.hstack((wLar[i], np.zeros((wLarShape[i][0], wSmallShape[numLayersSmall-2][0]))))
+            tempWS = np.hstack((np.zeros((wSmallShape[numLayersSmall-2][0], wLarShape[i][0])), np.eye(wSmallShape[numLayersSmall-2][0]))) # eye is identity matrix
 
             wMerged.append(np.concatenate((tempWL, tempWS)))
-            bMerged.append(np.concatenate((bLar[i], 
-                           np.expand_dims(np.zeros(wSmallShape[numLayersSmall-2][0]),
-                                          axis=1))))
+            bMerged.append(np.concatenate((bLar[i], np.expand_dims(np.zeros(wSmallShape[numLayersSmall-2][0]), axis=1))))
 
         # Case 4
         # Parallel output layer for the Small and Large Model. 
 
-        tempWL = np.hstack((wLar[numLayersLar-1], 
-                            np.zeros((wLarShape[numLayersLar-1][0], 
-                                      wSmallShape[-1][1]))))
-
-        tempWS = np.hstack((np.zeros((wSmallShape[-1][0], 
-                                      wLarShape[-1][1])), 
-                                      wSmall[numLayersSmall-1]))
+        tempWL = np.hstack((wLar[numLayersLar-1], np.zeros((wLarShape[numLayersLar-1][0], wSmallShape[-1][1]))))
+        tempWS = np.hstack((np.zeros((wSmallShape[-1][0], wLarShape[-1][1])), wSmall[numLayersSmall-1]))
 
         wMerged.append(np.concatenate((tempWL, tempWS)))
         bMerged.append(np.concatenate((bLar[numLayersLar-1], bSmall[numLayersSmall-1])))
@@ -242,9 +178,8 @@ class GenerateMergedNet:
         for index, bias in enumerate(bMerged):
             bMerged[index] = np.squeeze(bias)
         
-        # This is needed if both the networks had 1 dimensional outputs. 
-        if bMerged[-1].shape == (): 
-            bMerged[-1] = np.array([bMerged[-1]])  
+        if bMerged[-1].shape == ():
+            bMerged[-1] = np.array([bMerged[-1]]) # This is needed for a weird interaction between numpy and pytorch. 
 
         mergedDict = {
             "w": wMerged,
@@ -260,10 +195,6 @@ class GenerateMergedNet:
         Take the weights and biases and truncate them to num decimal places.
 
         Returns a new Model dictionary
-
-        Typical Usage: 
-            aModelDict = GenerateMergedNet._extract_pytorch_wandb(aModel)
-            aQuantDict = GenerateMergedNet.truncate_params(aModelDict, 4) # truncate to 4 decimal places. 
         """
 
         q_w = []
@@ -277,7 +208,7 @@ class GenerateMergedNet:
         QuantDict = {
             "w": q_w,
             "b": q_b,
-            "w_shapes": ModelDict["w_shapes"],
+            "w_shapes": ModelDict['w_shapes'],
             "b_shapes": ModelDict["b_shapes"],
             "acts": ModelDict["acts"]
         }
@@ -285,19 +216,62 @@ class GenerateMergedNet:
         return QuantDict
 
     @staticmethod
-    def generate_merged_sequential(ModelDict):
-        """ 
-        Given a Merged Net Dictionary, 
-        return a sequential pytorch model representation. 
-
-        Typical Usage: 
-            LargeModelDict = GenerateMergedNet._extract_pytorch_wandb(LargeModel)
-            SmallModelDict = GenerateMergedNet._extract_pytorch_wandb(SmallModel)
-            MergedModelDict = GenreateMergedNet.from_WandB(LargeModelDict, SmallModelDict)
-            SeqPytorchModel = GenerateMergedNet.generate_merged_sequetnail(MergedModelDict)
+    def generated_sequential_from_dictionary(ModelDict):
         """
-        
-        # Unpack the Merged Model Dictionary
+            Method to Generate a sequential pytorch model from a model dictionary.
+            Works for models that don't use an activation on the last linear layer. 
+        """
+
+        w = ModelDict['w']
+        w_shapes = ModelDict['w_shapes']
+        b = ModelDict['b']
+        b_shapes = ModelDict['b_shapes']
+        activations = ModelDict['acts']
+
+        seq = nn.Sequential()
+
+        # count the number of linear layers we add.
+        num_linear = 0
+        index = 0
+
+        # Add each liner that also has an activation function. 
+        for layer in activations:
+
+            in_features, out_features = tuple(reversed(w_shapes[index]))
+
+            seq.append(nn.Linear(in_features, out_features))
+            num_linear += 1
+
+            if layer == "ReLU":
+                seq.append(nn.ReLU())
+            else:
+                return NotImplementedError
+            index += 1
+
+        # Last Layer
+        in_features, out_features = tuple(reversed(w_shapes[-1]))
+        seq.append(nn.Linear(in_features, out_features)) # Output layers of the two separate networks
+        index += 1
+        num_linear += 1
+
+        # Has to be true or the model will be wrong
+        assert num_linear == len(w)
+
+        # Init weights and biases from merged net
+        index = 0
+        for layer in seq:
+            if isinstance(layer, nn.Linear):
+                layer.weight.data = torch.nn.parameter.Parameter(torch.tensor(w[index]))
+                layer.bias.data = torch.nn.parameter.Parameter(torch.tensor(b[index]))
+                index += 1
+
+        # Return the Sequential model
+        return seq
+
+    @staticmethod
+    def generate_merged_sequential(ModelDict):
+        """ Given a Merged Net Dictionary, return a sequential model pytorch representation. """
+
         weights = ModelDict['w']
         biases = ModelDict['b']
         activations = ModelDict['acts']
@@ -310,18 +284,13 @@ class GenerateMergedNet:
 
         # Add each layer that has a coresponding activation function. 
         for layer in activations:
-            seq.append(nn.Linear(weights[index].shape[-1], weights[index].shape[0])) 
+            seq.append(nn.Linear(weights[index].shape[-1], weights[index].shape[0]))
             num_linear += 1
 
             if layer == "ReLU":
                 seq.append(nn.ReLU())
-            elif layer == "tanh":
-                seq.append(nn.Tanh())
-            elif layer == "sigmoid":
-                seq.append(nn.Sigmoid())
             else:
-                raise Exception(f"The activation function '{layer}'  has not been implemented"
-                    "in the creation of a sequential merged model.")
+                return NotImplementedError
             index += 1
 
         # Last two linear layers for mergeed network
@@ -355,13 +324,6 @@ class GenerateMergedNet:
 
             The activation function used inbetween layers aside from the 
             last two linear layers is relu. 
-
-            Note this method was used extensively for debugging rather 
-            than practical application. 
-            
-            It is easier to just call "generate_merged_sequential" and 
-            run inferences on the model using pytorch instead of doing this
-            numpy implementation. 
         """
         outputs = []
 
@@ -388,26 +350,12 @@ class GenerateMergedNet:
     
     @staticmethod 
     def print_shapes(ModelDict):
-        """ 
-        Method to check the shapes of the Merged Network Model Dictionary 
-        Used for debugging. 
-
-        Typical Usage:
-            ModelDictionary = GenerateMergedNet._extract_pytorch_wandb(aModel)
-            GenerateMergedNet.print_shapes(ModelDictionary)
-
-            or 
-
-            LargeModelDict = GenerateMergedNet._extract_pytorch_wandb(LargeModel)
-            SmallModelDict = GenerateMergedNet._extract_pytorch_wandb(SmallModel)
-            MergedModelDict = GenreateMergedNet.from_WandB(LargeModelDict, SmallModelDict)
-            GenerateMergedNet.print_shapes(MergedModelDict)
-        """
+        """ Method to check the shapes of the Merged Network Model Dictionary """
 
         weights = ModelDict['w']
         biases = ModelDict['b']
 
-        print("\nWeights Shape:")
+        print("Weights Shape:")
         for weight in weights:
             print(weight.shape)
         
@@ -417,21 +365,7 @@ class GenerateMergedNet:
     
     @staticmethod
     def print_params(ModelDict):
-        """ 
-        Method to check the weights and biases of the Merged Network Model Dictonary
-        Used for debugging.  
-
-        Typical Usage:
-            ModelDictionary = GenerateMergedNet._extract_pytorch_wandb(aModel)
-            GenerateMergedNet.print_params(ModelDictionary)
-
-            or 
-
-            LargeModelDict = GenerateMergedNet._extract_pytorch_wandb(LargeModel)
-            SmallModelDict = GenerateMergedNet._extract_pytorch_wandb(SmallModel)
-            MergedModelDict = GenreateMergedNet.from_WandB(LargeModelDict, SmallModelDict)
-            GenerateMergedNet.print_params(MergedModelDict)
-        """
+        """ Method to check the weights and biases of the Merged Network Model Dictonary """
 
         weights = ModelDict['w']
         biases = ModelDict['b']
